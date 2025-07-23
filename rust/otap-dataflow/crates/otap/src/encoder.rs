@@ -595,18 +595,11 @@ where
 }
 
 /// A helper function to append ExponentialHistogramDataPoint Bucket data
-fn append_ehdp_bucket<View>(
-    view: Option<&View>,
-    builder: &mut BucketsRecordBatchBuilder,
-    scratch: &mut Vec<u64>,
-) where
+fn append_ehdp_bucket<View>(view: Option<&View>, builder: &mut BucketsRecordBatchBuilder)
+where
     View: BucketsView,
 {
-    let buckets = view.map(|v| {
-        scratch.clear();
-        scratch.extend(v.bucket_counts());
-        (v.offset(), &scratch[..])
-    });
+    let buckets = view.map(|v| (v.offset(), v.bucket_counts().copied()));
     builder.append(buckets)
 }
 
@@ -686,11 +679,6 @@ where
     let mut curr_resource_id: u16 = 0;
     let mut curr_scope_id: u16 = 0;
     let mut curr_metric_id: u16 = 0;
-
-    // These are scratch buffers so we don't have to reallocate a new one everytime we need
-    // one. They're used to ease conversion between iterators and slices.
-    let mut scratch_u64: Vec<u64> = Vec::new();
-    let mut scratch_f64: Vec<f64> = Vec::new();
 
     for resource_metric in metrics_view.resources() {
         if let Some(resource) = resource_metric.resource() {
@@ -824,12 +812,8 @@ where
                             hdp.append_start_time_unix_nano(hdp_view.start_time_unix_nano() as i64);
                             hdp.append_time_unix_nano(hdp_view.time_unix_nano() as i64);
                             hdp.append_count(hdp_view.count());
-                            scratch_u64.clear();
-                            scratch_u64.extend(hdp_view.bucket_counts());
-                            hdp.append_bucket_counts(&scratch_u64);
-                            scratch_f64.clear();
-                            scratch_f64.extend(hdp_view.explicit_bounds());
-                            hdp.append_explicit_bounds(&scratch_f64);
+                            hdp.append_bucket_counts(hdp_view.bucket_counts().copied());
+                            hdp.append_explicit_bounds(hdp_view.explicit_bounds().copied());
                             hdp.append_sum(hdp_view.sum());
                             hdp.append_flags(hdp_view.flags().into_inner());
                             hdp.append_min(hdp_view.min());
@@ -867,16 +851,8 @@ where
                                     &mut ehdpe_attrs,
                                 )?;
                             }
-                            append_ehdp_bucket(
-                                ehdp_view.positive().as_ref(),
-                                &mut ehdp.positive,
-                                &mut scratch_u64,
-                            );
-                            append_ehdp_bucket(
-                                ehdp_view.negative().as_ref(),
-                                &mut ehdp.negative,
-                                &mut scratch_u64,
-                            );
+                            append_ehdp_bucket(ehdp_view.positive().as_ref(), &mut ehdp.positive);
+                            append_ehdp_bucket(ehdp_view.negative().as_ref(), &mut ehdp.negative);
 
                             curr_ehdp_id =
                                 curr_ehdp_id.checked_add(1).ok_or(Error::U32OverflowError)?;

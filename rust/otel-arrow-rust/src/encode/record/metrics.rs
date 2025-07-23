@@ -952,15 +952,13 @@ impl HistogramDataPointsRecordBatchBuilder {
     }
 
     /// Append a value to the `bucket_counts` array.
-    pub fn append_bucket_counts(&mut self, val: &[u64]) {
-        self.bucket_counts
-            .append_value(val.iter().copied().map(Some))
+    pub fn append_bucket_counts(&mut self, val: impl Iterator<Item = u64>) {
+        self.bucket_counts.append_value(val.map(Some))
     }
 
     /// Append a value to the `explicit_bounds` array.
-    pub fn append_explicit_bounds(&mut self, val: &[f64]) {
-        self.explicit_bounds
-            .append_value(val.iter().copied().map(Some))
+    pub fn append_explicit_bounds(&mut self, val: impl Iterator<Item = f64>) {
+        self.explicit_bounds.append_value(val.map(Some))
     }
 
     /// Append a value to the `sum` array.
@@ -1407,12 +1405,11 @@ impl BucketsRecordBatchBuilder {
     }
 
     /// Append a new value.
-    pub fn append(&mut self, val: Option<(i32, &[u64])>) {
+    pub fn append(&mut self, val: Option<(i32, impl Iterator<Item = u64>)>) {
         match val {
             Some((offset, bucket_counts)) => {
                 self.offset.append_value(&offset);
-                self.bucket_counts
-                    .append_value(bucket_counts.iter().copied().map(Some));
+                self.bucket_counts.append_value(bucket_counts.map(Some));
                 self.nulls.append_non_null();
             }
             None => {
